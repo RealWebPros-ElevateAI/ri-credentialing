@@ -1153,7 +1153,7 @@ async function runBatch(){
     const p=providers[i];
     const prompt=`You are a healthcare credentialing specialist. Research the Louisiana Medicaid / Gainwell enrollment status for:\nProvider: ${p.fullName}\nNPI: ${p.npi}\nCredential: ${p.type}${p.affil?'\nAffiliation: '+p.affil:''}\n\nSearch the Louisiana Department of Health Medicaid provider portal and NPI registry. Return:\n- Gainwell Status: [Active / Not Found / Terminated / Pending / Denied / Unknown]\n- Participation Type: [FFS / MCO / FFS + MCO / Unknown]\n- Provider ID: [ID or Not Found]\n- Notes: [brief factual summary]`;
     try{
-      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+      const res=await fetch, ('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
       const data=await res.json();
       if(data.error) throw new Error(data.error.message);
       const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n')||'No response.';
