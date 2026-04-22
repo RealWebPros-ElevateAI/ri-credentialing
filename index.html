@@ -188,6 +188,34 @@
   .action-meta { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .action-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--bg3); color: var(--text2); border: 0.5px solid var(--border); }
   .mode-btns { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+
+  /* Report styles */
+  .report-wrap { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .report-section { margin-bottom: 2rem; }
+  .report-section-title { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); }
+  .report-kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .report-kpi { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .report-kpi-val { font-size: 32px; font-weight: 700; color: var(--text); line-height: 1; margin-bottom: 4px; }
+  .report-kpi-label { font-size: 12px; color: var(--text2); }
+  .report-kpi-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .report-progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .report-progress-label { font-size: 12px; color: var(--text); width: 180px; flex-shrink: 0; }
+  .report-progress-track { flex: 1; height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+  .report-progress-fill { height: 100%; border-radius: 4px; }
+  .report-progress-count { font-size: 12px; color: var(--text2); width: 60px; text-align: right; flex-shrink: 0; }
+  .report-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 1rem; }
+  .report-table th { text-align: left; padding: 7px 10px; font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .report-table td { padding: 8px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; color: var(--text); }
+  .report-table tr:last-child td { border-bottom: none; }
+  .report-table tr:hover td { background: var(--bg2); }
+  .report-action-item { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 6px; display: flex; gap: 10px; align-items: flex-start; }
+  .report-action-item.urgent { border-left: 3px solid var(--red); }
+  .report-action-item.required { border-left: 3px solid #EF9F27; }
+  .report-action-item.next { border-left: 3px solid var(--blue); }
+  .report-divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+  .npi-verified { color: var(--green); font-weight: 500; }
+  .npi-flag { color: var(--amber); font-weight: 500; }
+  .npi-notfound { color: var(--red); font-weight: 500; }
   .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--text); color: var(--bg); padding: 9px 15px; border-radius: var(--radius); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 999; }
   .toast.show { opacity: 1; }
   .section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
@@ -213,6 +241,7 @@
     <button class="tab" onclick="showTab('nppes',this)">NPI verification</button>
     <button class="tab" onclick="showTab('research',this)">Gainwell research</button>
     <button class="tab" onclick="showTab('actions',this)">Action items</button>
+    <button class="tab" onclick="showTab('report',this)">Report</button>
     <button class="tab" onclick="showTab('add',this)">Add providers</button>
     <button class="tab" onclick="showTab('summary',this)">Summary</button>
   </div>
@@ -350,6 +379,19 @@
     </div>
     <div id="actionStats" class="stats" style="margin-bottom:1rem"></div>
     <div id="actionsList"></div>
+  </div>
+
+  <!-- REPORT TAB -->
+  <div class="tab-panel" id="tab-report">
+    <div class="toolbar">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">Louisiana Medicaid Credentialing Report</div>
+        <div style="font-size:12px;color:var(--text2)" id="reportDate"></div>
+      </div>
+      <button class="btn btn-green" onclick="exportReportExcel()">Export to Excel ↓</button>
+      <button class="btn btn-blue" onclick="exportReportPDF()">Export to PDF ↓</button>
+    </div>
+    <div id="reportContent"></div>
   </div>
 
   <!-- SUMMARY TAB -->
@@ -956,6 +998,7 @@ function showTab(name,btn) {
   if(name==='nppes') renderNPPES();
   if(name==='research') renderResearch();
   if(name==='actions') renderActions();
+  if(name==='report') renderReport();
 }
 function setMode(m) {
   document.getElementById('panel-manual').style.display=m==='manual'?'block':'none';
@@ -1180,8 +1223,306 @@ function exportFull(){
   XLSX.writeFile(wb,'LA_PROV_ROSTER_Credentialing.xlsx');
 }
 
-function render(){updateStats();populateTypeFilter();renderRoster();}
-render();
+function renderReport() {
+  const now = new Date();
+  document.getElementById('reportDate').textContent = 'Generated ' + now.toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'}) + ' · The Bridge Center for Hope · Louisiana';
+
+  const indiv = providers.filter(p => !p.isFac);
+  const total = indiv.length;
+  const gwApproved = indiv.filter(p => p.payers.gainwell.status === 'Approved').length;
+  const gwNotStarted = indiv.filter(p => p.payers.gainwell.status === 'Not Started').length;
+  const gwInProgress = indiv.filter(p => ['Application Submitted','Pending Review'].includes(p.payers.gainwell.status)).length;
+  const gwNeedsAction = indiv.filter(p => ['Denied','Terminated','Revalidation Needed','Additional Information Requested'].includes(p.payers.gainwell.status)).length;
+  const nppesVerified = indiv.filter(p => p.nppesState === 'verified').length;
+  const nppesFlags = indiv.filter(p => p.nppesState === 'mismatch').length;
+  const nppesNotFound = indiv.filter(p => p.nppesState === 'notfound').length;
+  const allActions = [];
+  providers.forEach(p => buildActions(p).forEach(a => allActions.push({...a, provider:p})));
+  const urgent = allActions.filter(a => a.priority === 'urgent').length;
+  const required = allActions.filter(a => a.priority === 'required').length;
+  const next = allActions.filter(a => a.priority === 'next').length;
+
+  // Gainwell status breakdown
+  const gwStatuses = {};
+  STATUSES.forEach(s => { gwStatuses[s] = indiv.filter(p => p.payers.gainwell.status === s).length; });
+
+  // Progress bar color map
+  const barColors = { 'Approved':'#3B6D11', 'Application Submitted':'#185FA5', 'Pending Review':'#185FA5', 'Not Started':'#B4B2A9', 'Denied':'#A32D2D', 'Terminated':'#A32D2D', 'Revalidation Needed':'#854F0B', 'Additional Information Requested':'#854F0B' };
+
+  const el = document.getElementById('reportContent');
+  el.innerHTML = `<div class="report-wrap">
+
+    <!-- KPIs -->
+    <div class="report-section">
+      <div class="report-section-title">Overview</div>
+      <div class="report-kpi-grid">
+        <div class="report-kpi">
+          <div class="report-kpi-val">${total}</div>
+          <div class="report-kpi-label">Total providers</div>
+          <div class="report-kpi-sub">Individual clinicians</div>
+        </div>
+        <div class="report-kpi" style="border-color:${gwApproved>0?'#C0DD97':'var(--border)'}">
+          <div class="report-kpi-val" style="color:${gwApproved>0?'var(--green)':'var(--text)'}">${gwApproved}</div>
+          <div class="report-kpi-label">Gainwell approved</div>
+          <div class="report-kpi-sub">${Math.round(gwApproved/total*100)}% of roster</div>
+        </div>
+        <div class="report-kpi" style="border-color:${gwNeedsAction>0?'#F09595':'var(--border)'}">
+          <div class="report-kpi-val" style="color:${gwNeedsAction>0?'var(--red)':'var(--text)'}">${gwNeedsAction}</div>
+          <div class="report-kpi-label">Needs action</div>
+          <div class="report-kpi-sub">Denied, terminated, or flagged</div>
+        </div>
+        <div class="report-kpi" style="border-color:${urgent>0?'#F09595':required>0?'#FAC775':'var(--border)'}">
+          <div class="report-kpi-val" style="color:${urgent>0?'var(--red)':required>0?'var(--amber)':'var(--text)'}">${allActions.length}</div>
+          <div class="report-kpi-label">Open action items</div>
+          <div class="report-kpi-sub">${urgent} urgent · ${required} required · ${next} next</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gainwell enrollment progress -->
+    <div class="report-section">
+      <div class="report-section-title">Gainwell enrollment status breakdown</div>
+      ${Object.entries(gwStatuses).filter(([,count])=>count>0).map(([status,count])=>`
+        <div class="report-progress-row">
+          <div class="report-progress-label"><span class="pill ${pillClass(status)}">${status}</span></div>
+          <div class="report-progress-track"><div class="report-progress-fill" style="width:${Math.round(count/total*100)}%;background:${barColors[status]||'#888'}"></div></div>
+          <div class="report-progress-count">${count} of ${total}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- NPI verification summary -->
+    <div class="report-section">
+      <div class="report-section-title">NPI verification summary</div>
+      <div class="report-kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="report-kpi"><div class="report-kpi-val" style="color:var(--green)">${nppesVerified}</div><div class="report-kpi-label">Verified clean</div><div class="report-kpi-sub">NPI active, name matches</div></div>
+        <div class="report-kpi" style="${nppesFlags>0?'border-color:#FAC775':''}"><div class="report-kpi-val" style="color:${nppesFlags>0?'var(--amber)':'var(--text)'}">${nppesFlags}</div><div class="report-kpi-label">Flags / mismatches</div><div class="report-kpi-sub">Requires attention before enrollment</div></div>
+        <div class="report-kpi" style="${nppesNotFound>0?'border-color:#F09595':''}"><div class="report-kpi-val" style="color:${nppesNotFound>0?'var(--red)':'var(--text)'}">${nppesNotFound}</div><div class="report-kpi-label">Not found</div><div class="report-kpi-sub">NPI not in federal registry</div></div>
+      </div>
+      ${nppesFlags > 0 || nppesNotFound > 0 ? `
+      <table class="report-table">
+        <thead><tr><th>Provider</th><th>NPI</th><th>Type</th><th>Issue</th></tr></thead>
+        <tbody>${indiv.filter(p=>p.nppesState==='mismatch'||p.nppesState==='notfound').map(p=>`
+          <tr>
+            <td style="font-weight:500">${p.fullName}</td>
+            <td style="font-family:monospace">${p.npi}</td>
+            <td>${p.type}</td>
+            <td>${p.nppesState==='notfound'?'<span class="npi-notfound">NPI not found in registry</span>':p.nppesFlags.map(f=>`<span class="npi-flag">${f}</span>`).join('<br>')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '<div style="font-size:13px;color:var(--green);padding:8px 0">All verified providers cleared NPI check.</div>'}
+    </div>
+
+    <!-- Provider status table -->
+    <div class="report-section">
+      <div class="report-section-title">Provider enrollment status — all payers</div>
+      <div style="overflow-x:auto">
+      <table class="report-table">
+        <thead><tr>
+          <th>Provider</th><th>Type</th><th>NPI</th><th>NPI check</th>
+          <th>Gainwell</th><th>Participation</th>
+          <th>Aetna</th><th>AmeriHealth</th><th>Healthy Blue</th><th>Humana</th><th>LA HC</th><th>UHC</th>
+        </tr></thead>
+        <tbody>${indiv.map(p=>{
+          const gw=p.payers.gainwell;
+          const npiCheck = {verified:'<span class="npi-verified">✓ Verified</span>',mismatch:'<span class="npi-flag">⚠ Flag</span>',notfound:'<span class="npi-notfound">✗ Not found</span>',waiting:'—',running:'—',error:'—'}[p.nppesState]||'—';
+          return `<tr>
+            <td style="font-weight:500;white-space:nowrap">${p.fullName}</td>
+            <td>${p.type}</td>
+            <td style="font-family:monospace;font-size:11px">${p.npi}</td>
+            <td>${npiCheck}</td>
+            <td><span class="pill ${pillClass(gw.status)}" style="font-size:10px">${gw.status}</span></td>
+            <td style="font-size:11px">${gw.participationType==='ffs'?'FFS':gw.participationType==='mco'?'MCO':'FFS+MCO'}</td>
+            ${['aetna','amerihealth','healthyblue','humana','lahc','uhc'].map(id=>`<td><span class="pill ${pillClass(p.payers[id].status)}" style="font-size:10px">${p.payers[id].status==='Not Started'?'—':p.payers[id].status}</span></td>`).join('')}
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- Action items -->
+    <div class="report-section">
+      <div class="report-section-title">Action items (${allActions.length} total)</div>
+      ${['urgent','required','next'].map(priority => {
+        const items = allActions.filter(a=>a.priority===priority);
+        if(!items.length) return '';
+        const label = {urgent:'Urgent',required:'Required before enrollment',next:'Next steps'}[priority];
+        const color = {urgent:'var(--red)',required:'var(--amber)',next:'var(--blue)'}[priority];
+        return `<div style="font-size:11px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px">${label} (${items.length})</div>
+        ${items.map(a=>`
+          <div class="report-action-item ${priority}">
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600;color:var(--text)">${a.provider.fullName} <span style="font-weight:400;color:var(--text2)">· ${a.provider.type}</span></div>
+              <div style="font-size:12px;color:var(--text);margin-top:2px">${a.what}</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.5">${a.steps.map((s,i)=>`${i+1}. ${s}`).join(' &nbsp;·&nbsp; ')}</div>
+            </div>
+          </div>`).join('')}`;
+      }).join('')}
+    </div>
+
+    ${indiv.some(p=>p.notes) ? `
+    <div class="report-section">
+      <div class="report-section-title">Provider notes</div>
+      <table class="report-table">
+        <thead><tr><th>Provider</th><th>Notes</th></tr></thead>
+        <tbody>${indiv.filter(p=>p.notes).map(p=>`<tr><td style="font-weight:500;white-space:nowrap">${p.fullName}</td><td>${p.notes}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}
+
+  </div>`;
+}
+
+function exportReportExcel() {
+  const indiv = providers.filter(p => !p.isFac);
+  const now = new Date().toLocaleDateString('en-US');
+  const allActions = [];
+  providers.forEach(p => buildActions(p).forEach(a => allActions.push({...a,provider:p})));
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Provider status
+  const hdrs1 = ['Provider','NPI','Type','NPI Check','NPI Flags','Gainwell Status','Participation Type','Gainwell Provider ID','Aetna','AmeriHealth','Healthy Blue','Humana','LA HC','UHC','Notes'];
+  const rows1 = indiv.map(p => {
+    const gw = p.payers.gainwell;
+    return [p.fullName,p.npi,p.type,{verified:'Verified',mismatch:'Mismatch',notfound:'Not Found',waiting:'Not run'}[p.nppesState]||'Not run',p.nppesFlags.join('; ')||'None',gw.status,gw.participationType,gw.providerId,...['aetna','amerihealth','healthyblue','humana','lahc','uhc'].map(id=>p.payers[id].status),p.notes||''];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([hdrs1,...rows1]);
+  ws1['!cols'] = [{wch:22},{wch:13},{wch:8},{wch:10},{wch:40},{wch:18},{wch:14},{wch:18},{wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Provider Status');
+
+  // Sheet 2: Action items
+  const hdrs2 = ['Priority','Provider','NPI','Type','Action Required','Steps'];
+  const rows2 = allActions.map(a => [
+    {urgent:'Urgent',required:'Required Before Enrollment',next:'Next Step'}[a.priority],
+    a.provider.fullName, a.provider.npi, a.provider.type, a.what, a.steps.join(' | ')
+  ]);
+  const ws2 = XLSX.utils.aoa_to_sheet([hdrs2,...rows2]);
+  ws2['!cols'] = [{wch:22},{wch:22},{wch:13},{wch:8},{wch:50},{wch:80}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Action Items');
+
+  // Sheet 3: NPI flags
+  const flagged = indiv.filter(p => p.nppesState === 'mismatch' || p.nppesState === 'notfound');
+  const hdrs3 = ['Provider','NPI','Type','NPPES Status','Flags'];
+  const rows3 = flagged.map(p => [p.fullName, p.npi, p.type, p.nppesState === 'notfound' ? 'Not Found' : 'Mismatch', p.nppesFlags.join('; ')]);
+  const ws3 = XLSX.utils.aoa_to_sheet([hdrs3,...rows3]);
+  ws3['!cols'] = [{wch:22},{wch:13},{wch:8},{wch:12},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'NPI Flags');
+
+  XLSX.writeFile(wb, 'LA_Credentialing_Report_'+now.replace(/\//g,'-')+'.xlsx');
+}
+
+function exportReportPDF() {
+  const now = new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'});
+  const indiv = providers.filter(p => !p.isFac);
+  const allActions = [];
+  providers.forEach(p => buildActions(p).forEach(a => allActions.push({...a,provider:p})));
+  const urgent = allActions.filter(a=>a.priority==='urgent').length;
+  const required = allActions.filter(a=>a.priority==='required').length;
+  const next = allActions.filter(a=>a.priority==='next').length;
+  const gwApproved = indiv.filter(p=>p.payers.gainwell.status==='Approved').length;
+  const nppesVerified = indiv.filter(p=>p.nppesState==='verified').length;
+  const nppesIssues = indiv.filter(p=>p.nppesState==='mismatch'||p.nppesState==='notfound').length;
+
+  const statusColors = {'Approved':'#27500A','Not Started':'#5F5E5A','Application Submitted':'#0C447C','Pending Review':'#0C447C','Denied':'#501313','Terminated':'#501313','Revalidation Needed':'#633806','Additional Information Requested':'#633806'};
+  const statusBg = {'Approved':'#EAF3DE','Not Started':'#F1EFE8','Application Submitted':'#E6F1FB','Pending Review':'#E6F1FB','Denied':'#FCEBEB','Terminated':'#FCEBEB','Revalidation Needed':'#FAEEDA','Additional Information Requested':'#FAEEDA'};
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>LA Credentialing Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #1a1a19; margin: 0; padding: 0; }
+    .page { max-width: 900px; margin: 0 auto; padding: 40px; }
+    h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+    .subtitle { font-size: 12px; color: #6b6b67; margin-bottom: 32px; }
+    h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6b6b67; border-bottom: 2px solid #e5e5e5; padding-bottom: 6px; margin: 24px 0 12px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+    .kpi { border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; }
+    .kpi-val { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .kpi-label { font-size: 11px; color: #6b6b67; }
+    .kpi-sub { font-size: 10px; color: #9b9b97; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 16px; }
+    th { text-align: left; padding: 6px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #f5f5f4; border-bottom: 1px solid #e5e5e5; }
+    td { padding: 7px 8px; border-bottom: 0.5px solid #e5e5e5; vertical-align: middle; }
+    .pill { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+    .action { border-left: 3px solid #ccc; padding: 8px 12px; margin-bottom: 6px; background: #fafafa; border-radius: 0 4px 4px 0; }
+    .action.urgent { border-left-color: #A32D2D; }
+    .action.required { border-left-color: #EF9F27; }
+    .action.next { border-left-color: #185FA5; }
+    .action-provider { font-weight: 600; font-size: 11px; }
+    .action-what { font-size: 11px; margin-top: 2px; }
+    .action-steps { font-size: 10px; color: #6b6b67; margin-top: 4px; }
+    .prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .prog-label { width: 200px; font-size: 11px; flex-shrink: 0; }
+    .prog-bar { flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 3px; }
+    .prog-count { width: 50px; text-align: right; font-size: 11px; color: #6b6b67; flex-shrink: 0; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+  </head><body><div class="page">
+    <h1>Louisiana Medicaid Credentialing Report</h1>
+    <div class="subtitle">The Bridge Center for Hope &nbsp;·&nbsp; Recovery Innovations &nbsp;·&nbsp; Generated ${now}</div>
+
+    <h2>Overview</h2>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-val">${indiv.length}</div><div class="kpi-label">Total providers</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:#27500A">${gwApproved}</div><div class="kpi-label">Gainwell approved</div><div class="kpi-sub">${Math.round(gwApproved/indiv.length*100)}% of roster</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:${nppesIssues>0?'#A32D2D':'#27500A'}">${nppesVerified}</div><div class="kpi-label">NPI verified clean</div><div class="kpi-sub">${nppesIssues} with flags</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:${urgent>0?'#A32D2D':'#1a1a19'}">${allActions.length}</div><div class="kpi-label">Open action items</div><div class="kpi-sub">${urgent} urgent · ${required} required · ${next} next</div></div>
+    </div>
+
+    <h2>Gainwell enrollment breakdown</h2>
+    ${Object.entries(STATUSES.reduce((acc,s)=>{acc[s]=indiv.filter(p=>p.payers.gainwell.status===s).length;return acc;},{})).filter(([,c])=>c>0).map(([s,c])=>`
+      <div class="prog-row">
+        <div class="prog-label"><span class="pill" style="background:${statusBg[s]||'#eee'};color:${statusColors[s]||'#333'}">${s}</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${Math.round(c/indiv.length*100)}%;background:${statusColors[s]||'#888'}"></div></div>
+        <div class="prog-count">${c} / ${indiv.length}</div>
+      </div>`).join('')}
+
+    <h2>NPI verification results</h2>
+    ${nppesIssues > 0 ? `<table>
+      <thead><tr><th>Provider</th><th>NPI</th><th>Type</th><th>Issue</th></tr></thead>
+      <tbody>${indiv.filter(p=>p.nppesState==='mismatch'||p.nppesState==='notfound').map(p=>`
+        <tr><td><strong>${p.fullName}</strong></td><td style="font-family:monospace">${p.npi}</td><td>${p.type}</td>
+        <td style="color:${p.nppesState==='notfound'?'#A32D2D':'#854F0B'}">${p.nppesState==='notfound'?'NPI not found in registry':p.nppesFlags.join('; ')}</td></tr>`).join('')}
+      </tbody></table>` : '<p style="color:#27500A">All verified providers cleared NPI check.</p>'}
+
+    <h2>Provider status — all payers</h2>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Provider</th><th>Type</th><th>NPI check</th><th>Gainwell</th><th>Aetna</th><th>AmeriHealth</th><th>Healthy Blue</th><th>Humana</th><th>LA HC</th><th>UHC</th></tr></thead>
+      <tbody>${indiv.map(p=>{
+        const gw=p.payers.gainwell;
+        const nc={verified:'✓',mismatch:'⚠',notfound:'✗',waiting:'—'}[p.nppesState]||'—';
+        const ncColor={verified:'#27500A',mismatch:'#854F0B',notfound:'#A32D2D',waiting:'#9b9b97'}[p.nppesState]||'#9b9b97';
+        return `<tr>
+          <td><strong>${p.fullName}</strong></td><td>${p.type}</td>
+          <td style="color:${ncColor};font-weight:600">${nc}</td>
+          <td><span class="pill" style="background:${statusBg[gw.status]||'#eee'};color:${statusColors[gw.status]||'#333'}">${gw.status}</span></td>
+          ${['aetna','amerihealth','healthyblue','humana','lahc','uhc'].map(id=>`<td><span class="pill" style="background:${statusBg[p.payers[id].status]||'#eee'};color:${statusColors[p.payers[id].status]||'#333'}">${p.payers[id].status==='Not Started'?'—':p.payers[id].status}</span></td>`).join('')}
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+
+    <h2>Action items (${allActions.length})</h2>
+    ${['urgent','required','next'].map(priority=>{
+      const items=allActions.filter(a=>a.priority===priority);
+      if(!items.length) return '';
+      const label={urgent:'Urgent',required:'Required before enrollment',next:'Next steps'}[priority];
+      const color={urgent:'#A32D2D',required:'#854F0B',next:'#185FA5'}[priority];
+      return `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${color};margin:12px 0 6px">${label}</div>
+      ${items.map(a=>`<div class="action ${priority}">
+        <div class="action-provider">${a.provider.fullName} · ${a.provider.type}</div>
+        <div class="action-what">${a.what}</div>
+        <div class="action-steps">${a.steps.map((s,i)=>`${i+1}. ${s}`).join(' &nbsp; ')}</div>
+      </div>`).join('')}`;
+    }).join('')}
+
+  </div></body></html>`;
+
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+}
 </script>
 </body>
 </html>
