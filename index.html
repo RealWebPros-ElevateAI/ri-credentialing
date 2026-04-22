@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RI Louisiana Credentialing Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --bg2: #f5f5f4; --bg3: #eeece8;
+    --text: #1a1a19; --text2: #6b6b67; --text3: #9b9b97;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --blue-bg: #E6F1FB; --blue: #185FA5; --blue-dark: #0C447C;
+    --green-bg: #EAF3DE; --green: #3B6D11; --green-dark: #27500A;
+    --amber-bg: #FAEEDA; --amber: #854F0B; --amber-dark: #633806;
+    --red-bg: #FCEBEB; --red: #A32D2D; --red-dark: #501313;
+    --gray-bg: #F1EFE8; --gray: #5F5E5A; --gray-dark: #444441;
+    --radius: 8px; --radius-lg: 12px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: var(--text); background: var(--bg3); min-height: 100vh; }
+  .app { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; }
+  .app-header { margin-bottom: 2rem; }
+  .app-header h1 { font-size: 22px; font-weight: 600; color: var(--text); }
+  .app-header p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .tab { padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--text); border-bottom-color: var(--text); }
+  .tab-panel { display: none; } .tab-panel.active { display: block; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat { background: var(--bg); border-radius: var(--radius); padding: 12px 14px; border: 0.5px solid var(--border); }
+  .stat-label { font-size: 11px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 600; color: var(--text); }
+
+  /* Buttons */
+  .btn { padding: 8px 16px; font-size: 13px; font-weight: 500; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: var(--bg2); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .btn-primary:hover { opacity: 0.85; background: var(--text); }
+  .btn-blue { background: var(--blue); color: var(--blue-bg); border-color: var(--blue); }
+  .btn-blue:hover:not(:disabled) { opacity: 0.85; }
+  .btn-green { background: var(--green); color: var(--green-bg); border-color: var(--green); }
+  .btn-green:hover:not(:disabled) { opacity: 0.85; }
+
+  /* Toolbar */
+  .toolbar { display: flex; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center; }
+  .toolbar input[type=text], .toolbar select { padding: 7px 10px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+  .toolbar input[type=text] { flex: 1; min-width: 160px; }
+  .toolbar input:focus, .toolbar select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+  /* Provider cards */
+  .pcard { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; overflow: hidden; }
+  .pcard.c-verified { border-color: #C0DD97; }
+  .pcard.c-mismatch { border-color: #FAC775; }
+  .pcard.c-notfound { border-color: #F09595; }
+  .pcard-hdr { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; }
+  .pcard-hdr:hover { background: var(--bg2); }
+  .avi { width: 34px; height: 34px; border-radius: 50%; background: var(--blue-bg); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--blue); flex-shrink: 0; }
+  .avi.fac { background: var(--blue); color: var(--blue-bg); border-radius: 6px; font-size: 10px; }
+  .pcard-meta { flex: 1; min-width: 0; }
+  .pcard-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .pcard-sub { font-size: 11px; color: var(--text2); margin-top: 1px; font-family: monospace; }
+  .pcard-badges { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+  .pcard-exp { font-size: 12px; color: var(--text3); margin-left: 4px; flex-shrink: 0; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+  .pill-ns { background: var(--gray-bg); color: var(--gray-dark); }
+  .pill-approved { background: var(--green-bg); color: var(--green-dark); }
+  .pill-pending { background: var(--amber-bg); color: var(--amber-dark); }
+  .pill-denied, .pill-terminated { background: var(--red-bg); color: var(--red-dark); }
+  .pill-submitted { background: var(--blue-bg); color: var(--blue-dark); }
+  .pill-revalidation { background: #FBEAF0; color: #4B1528; }
+  .pill-info { background: var(--amber-bg); color: var(--amber-dark); }
+  .pill-action { background: var(--red-bg); color: var(--red-dark); }
+  .pill-verified { background: var(--green-bg); color: var(--green-dark); }
+  .pill-mismatch { background: var(--amber-bg); color: var(--amber-dark); }
+  .pill-notfound { background: var(--red-bg); color: var(--red-dark); }
+
+  .pcard-body { border-top: 0.5px solid var(--border); padding: 14px; display: none; }
+  .pcard-body.open { display: block; }
+
+  /* Info strip */
+  .info-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; background: var(--bg2); border-radius: var(--radius); padding: 10px 12px; }
+  .inf-label { font-size: 10px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+  .inf-val { font-size: 12px; color: var(--text); font-weight: 500; }
+  .inf-val.mono { font-family: monospace; }
+
+  /* NPPES compare */
+  .nppes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .nppes-col { background: var(--bg2); border-radius: var(--radius); padding: 10px 12px; }
+  .nppes-col.registry { background: var(--blue-bg); }
+  .col-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; color: var(--text2); }
+  .col-title.reg { color: var(--blue-dark); }
+  .field { margin-bottom: 6px; }
+  .field-lbl { font-size: 10px; color: var(--text2); margin-bottom: 1px; }
+  .field-val { font-size: 12px; color: var(--text); font-weight: 500; }
+  .flag-ok { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--green-bg); color: var(--green-dark); font-weight: 500; }
+  .flag-warn { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--amber-bg); color: var(--amber-dark); font-weight: 500; }
+  .flag-bad { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--red-bg); color: var(--red-dark); font-weight: 500; }
+
+  .nppes-extra { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 12px; }
+  .ext-box { background: var(--bg2); border-radius: var(--radius); padding: 8px 10px; }
+
+  /* Payer grid */
+  .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .prow { background: var(--bg2); border-radius: var(--radius); padding: 10px 12px; }
+  .prow.gw { background: var(--blue-bg); border: 0.5px solid #B5D4F4; grid-column: 1/-1; }
+  .prow-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .prow.gw .prow-name { color: var(--blue-dark); }
+  .gw-inner { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 4px; }
+  .fl { font-size: 10px; color: var(--text2); margin-top: 5px; margin-bottom: 2px; }
+  .pf { width: 100%; padding: 5px 7px; font-size: 12px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+  .warn-tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 20px; background: var(--amber-bg); color: var(--amber-dark); font-weight: 500; margin-bottom: 4px; }
+  .res-bar { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .res-out { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 12px; font-size: 12px; line-height: 1.6; display: none; margin-top: 8px; }
+  .res-out.on { display: block; }
+  .res-lbl { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+
+  /* Notes */
+  textarea.notes { width: 100%; padding: 8px 10px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); resize: vertical; min-height: 52px; font-family: inherit; }
+  .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 0.5px solid var(--border); }
+  .del { font-size: 12px; color: var(--red); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: var(--radius); }
+  .del:hover { background: var(--red-bg); }
+
+  /* Add form */
+  .add-form { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 1.25rem; }
+  .frow { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .ff label { display: block; font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .ff input, .ff select { width: 100%; padding: 7px 10px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+  .fa { display: flex; justify-content: flex-end; }
+
+  /* Upload */
+  .upload-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius-lg); padding: 2rem; text-align: center; cursor: pointer; background: var(--bg2); margin-bottom: 1rem; }
+  .upload-zone:hover { border-color: var(--blue); background: var(--bg); }
+  .upload-zone p { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .upload-zone span { font-size: 12px; color: var(--text2); }
+  .template-note { background: var(--blue-bg); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: var(--blue-dark); line-height: 1.6; margin-bottom: 1rem; }
+
+  /* Progress */
+  .prog-wrap { flex: 1; min-width: 180px; }
+  .prog-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: flex; justify-content: space-between; }
+  .prog-track { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; border: 0.5px solid var(--border); }
+  .prog-fill { height: 100%; background: var(--blue); border-radius: 3px; transition: width 0.3s ease; width: 0%; }
+
+  /* Summary table */
+  .sum-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sum-table th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+  .sum-table td { padding: 9px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+
+  /* Dot status */
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot.waiting { background: #D3D1C7; }
+  .dot.running { background: var(--blue); animation: pulse 1.2s infinite; }
+  .dot.verified { background: var(--green); }
+  .dot.mismatch { background: #EF9F27; }
+  .dot.notfound, .dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+
+  .empty { text-align: center; padding: 3rem; color: var(--text2); }
+  .empty strong { display: block; font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+
+  /* Action items */
+  .action-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; overflow: hidden; }
+  .action-card.urgent { border-left: 3px solid var(--red); }
+  .action-card.required { border-left: 3px solid #EF9F27; }
+  .action-card.next { border-left: 3px solid var(--blue); }
+  .action-hdr { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  .action-hdr:hover { background: var(--bg2); }
+  .priority-badge { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; text-transform: uppercase; letter-spacing: .04em; }
+  .pb-urgent { background: var(--red-bg); color: var(--red-dark); }
+  .pb-required { background: var(--amber-bg); color: var(--amber-dark); }
+  .pb-next { background: var(--blue-bg); color: var(--blue-dark); }
+  .action-main { flex: 1; min-width: 0; }
+  .action-provider { font-size: 13px; font-weight: 500; color: var(--text); }
+  .action-what { font-size: 13px; color: var(--text); margin-top: 2px; }
+  .action-exp { font-size: 12px; color: var(--text3); margin-left: 4px; flex-shrink: 0; }
+  .action-body { border-top: 0.5px solid var(--border); padding: 12px 14px; display: none; background: var(--bg2); }
+  .action-body.open { display: block; }
+  .action-why { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 10px; }
+  .action-steps { list-style: none; padding: 0; }
+  .action-steps li { font-size: 12px; color: var(--text); padding: 5px 0 5px 18px; position: relative; line-height: 1.5; border-bottom: 0.5px solid var(--border); }
+  .action-steps li:last-child { border-bottom: none; }
+  .action-steps li::before { content: '→'; position: absolute; left: 0; color: var(--text3); }
+  .action-meta { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .action-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--bg3); color: var(--text2); border: 0.5px solid var(--border); }
+  .mode-btns { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+  .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--text); color: var(--bg); padding: 9px 15px; border-radius: var(--radius); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+  .export-bar { display: flex; gap: 10px; align-items: center; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="app-header">
+    <h1>Louisiana Medicaid credentialing tracker</h1>
+    <p>Recovery Innovations · The Bridge Center for Hope · Gainwell &amp; MCO enrollment</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Providers</div><div class="stat-value" id="sTotal">0</div></div>
+    <div class="stat"><div class="stat-label">Gainwell approved</div><div class="stat-value" id="sApproved" style="color:var(--green)">0</div></div>
+    <div class="stat"><div class="stat-label">Needs action</div><div class="stat-value" id="sAction" style="color:var(--red)">0</div></div>
+    <div class="stat"><div class="stat-label">Not started</div><div class="stat-value" id="sNone" style="color:var(--gray)">0</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('roster',this)">Roster</button>
+    <button class="tab" onclick="showTab('nppes',this)">NPI verification</button>
+    <button class="tab" onclick="showTab('research',this)">Gainwell research</button>
+    <button class="tab" onclick="showTab('actions',this)">Action items</button>
+    <button class="tab" onclick="showTab('add',this)">Add providers</button>
+    <button class="tab" onclick="showTab('summary',this)">Summary</button>
+  </div>
+
+  <!-- ROSTER TAB -->
+  <div class="tab-panel active" id="tab-roster">
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="Search name, NPI, credential…" oninput="renderRoster()" />
+      <select id="filterType" onchange="renderRoster()"><option value="">All types</option></select>
+      <select id="filterStatus" onchange="renderRoster()">
+        <option value="">All Gainwell statuses</option>
+        <option>Not Started</option><option>Application Submitted</option><option>Pending Review</option>
+        <option>Additional Information Requested</option><option>Approved</option><option>Denied</option>
+        <option>Revalidation Needed</option><option>Terminated</option>
+      </select>
+    </div>
+    <div id="rosterList"></div>
+  </div>
+
+  <!-- NPPES TAB -->
+  <div class="tab-panel" id="tab-nppes">
+    <div class="toolbar">
+      <button class="btn btn-blue" id="btnNPPES" onclick="runNPPES()">Verify all providers</button>
+      <div class="prog-wrap">
+        <div class="prog-label"><span id="nppesProgLabel">Ready</span><span id="nppesProgCount">0 / 0</span></div>
+        <div class="prog-track"><div class="prog-fill" id="nppesProgFill"></div></div>
+      </div>
+    </div>
+    <div class="stats" style="margin-bottom:1rem">
+      <div class="stat"><div class="stat-label">Verified</div><div class="stat-value" id="nvVerified" style="color:var(--green)">0</div></div>
+      <div class="stat"><div class="stat-label">Mismatches</div><div class="stat-value" id="nvMismatch" style="color:var(--amber)">0</div></div>
+      <div class="stat"><div class="stat-label">Not found</div><div class="stat-value" id="nvNotFound" style="color:var(--red)">0</div></div>
+      <div class="stat"><div class="stat-label">Pending</div><div class="stat-value" id="nvPending" style="color:var(--gray)">0</div></div>
+    </div>
+    <div id="nppesList"></div>
+    <div class="export-bar" id="nppesExportBar" style="display:none">
+      <button class="btn btn-green" onclick="exportNPPES()">Export verification report ↓</button>
+      <span style="font-size:12px;color:var(--text2)">Downloads NPPES results with all flags</span>
+    </div>
+  </div>
+
+  <!-- GAINWELL RESEARCH TAB -->
+  <div class="tab-panel" id="tab-research">
+    <div class="toolbar">
+      <button class="btn btn-blue" id="btnBatch" onclick="runBatch()">Run batch research</button>
+      <button class="btn" id="btnStop" onclick="stopBatch()" disabled>Stop</button>
+      <div class="prog-wrap">
+        <div class="prog-label"><span id="batchProgLabel">Ready</span><span id="batchProgCount">0 / 0</span></div>
+        <div class="prog-track"><div class="prog-fill" id="batchProgFill"></div></div>
+      </div>
+    </div>
+    <div class="stats" style="margin-bottom:1rem">
+      <div class="stat"><div class="stat-label">Completed</div><div class="stat-value" id="brDone">0</div></div>
+      <div class="stat"><div class="stat-label">Enrolled (found)</div><div class="stat-value" id="brFound" style="color:var(--green)">0</div></div>
+      <div class="stat"><div class="stat-label">Not found</div><div class="stat-value" id="brUnknown" style="color:var(--gray)">0</div></div>
+      <div class="stat"><div class="stat-label">Errors</div><div class="stat-value" id="brError" style="color:var(--red)">0</div></div>
+    </div>
+    <div id="researchList"></div>
+    <div class="export-bar" id="researchExportBar" style="display:none">
+      <button class="btn btn-green" onclick="exportResearch()">Export research results ↓</button>
+    </div>
+  </div>
+
+  <!-- ADD PROVIDERS TAB -->
+  <div class="tab-panel" id="tab-add">
+    <div class="mode-btns">
+      <button class="btn active" id="mb-manual" onclick="setMode('manual')">Manual entry</button>
+      <button class="btn" id="mb-upload" onclick="setMode('upload')">Spreadsheet upload</button>
+    </div>
+    <div id="panel-manual">
+      <div class="add-form">
+        <div class="frow">
+          <div class="ff"><label>First name *</label><input id="fFirst" placeholder="First" /></div>
+          <div class="ff"><label>Middle name</label><input id="fMiddle" placeholder="Middle" /></div>
+          <div class="ff"><label>Last name *</label><input id="fLast" placeholder="Last" /></div>
+        </div>
+        <div class="frow">
+          <div class="ff"><label>NPI #</label><input id="fNPI" placeholder="10-digit NPI" /></div>
+          <div class="ff"><label>Provider type</label>
+            <select id="fType"><option value="">— select —</option>
+              <option>ADC</option><option>FAC</option><option>LCSW</option><option>LMFT</option>
+              <option>LMSW</option><option>LPC</option><option>MD</option><option>NP</option>
+              <option>PA</option><option>PC</option><option>PLPC</option><option>PMHNP</option><option>Other</option>
+            </select>
+          </div>
+          <div class="ff"><label>Practice / affiliation</label><input id="fAffil" value="The Bridge Center for Hope" /></div>
+        </div>
+        <div class="frow">
+          <div class="ff"><label>Group NPI</label><input id="fGNPI" /></div>
+          <div class="ff"><label>Full address</label><input id="fAddr" /></div>
+          <div class="ff"><label>Gainwell status</label>
+            <select id="fGWStatus">
+              <option>Not Started</option><option>Application Submitted</option><option>Pending Review</option>
+              <option>Additional Information Requested</option><option>Approved</option><option>Denied</option>
+              <option>Revalidation Needed</option><option>Terminated</option>
+            </select>
+          </div>
+        </div>
+        <div class="fa"><button class="btn btn-primary" onclick="addManual()">Add provider</button></div>
+      </div>
+    </div>
+    <div id="panel-upload" style="display:none">
+      <div class="template-note">
+        Expected columns: <strong>NPI #, First Name, Middle Name, Last Name, Provider Type, Practice/Affiliation, Group NPI, Full Address</strong>
+        <br><span style="cursor:pointer;text-decoration:underline;color:var(--blue)" onclick="dlTemplate()">Download sample template</span>
+      </div>
+      <div class="upload-zone" onclick="document.getElementById('fileInput').click()"
+           ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+        <p>Click to upload or drag &amp; drop</p>
+        <span>.xlsx, .xls, or .csv</span>
+        <input type="file" id="fileInput" style="display:none" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])" />
+      </div>
+      <div id="importPreview" style="display:none;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:500;margin-bottom:10px" id="prevTitle">Preview</div>
+        <div style="overflow-x:auto"><table class="sum-table" id="prevTable"></table></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+          <span style="font-size:12px;color:var(--text2)" id="prevCount"></span>
+          <button class="btn" onclick="cancelImport()">Cancel</button>
+          <button class="btn btn-primary" onclick="confirmImport()">Import providers</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION ITEMS TAB -->
+  <div class="tab-panel" id="tab-actions">
+    <div class="toolbar">
+      <select id="actionFilter" onchange="renderActions()">
+        <option value="">All priorities</option>
+        <option value="urgent">Urgent</option>
+        <option value="required">Required before enrollment</option>
+        <option value="next">Next step</option>
+      </select>
+      <button class="btn btn-green" onclick="exportActions()">Export action list ↓</button>
+    </div>
+    <div id="actionStats" class="stats" style="margin-bottom:1rem"></div>
+    <div id="actionsList"></div>
+  </div>
+
+  <!-- SUMMARY TAB -->
+  <div class="tab-panel" id="tab-summary">
+    <div class="toolbar">
+      <button class="btn btn-green" onclick="exportFull()">Export full roster to Excel ↓</button>
+    </div>
+    <div id="summaryContent"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PAYERS = [
+  {id:'gainwell',name:'Louisiana Medicaid / Gainwell',priority:true},
+  {id:'aetna',name:'Aetna Better Health of LA'},
+  {id:'amerihealth',name:'AmeriHealth Caritas Louisiana'},
+  {id:'healthyblue',name:'Healthy Blue'},
+  {id:'humana',name:'Humana Healthy Horizons in LA'},
+  {id:'lahc',name:'Louisiana Healthcare Connections'},
+  {id:'uhc',name:'UnitedHealthcare Community Plan',warning:'Contract ended 3/31/2026'}
+];
+const STATUSES = ['Not Started','Application Submitted','Pending Review','Additional Information Requested','Approved','Denied','Revalidation Needed','Terminated'];
+const STORE_KEY = 'ri_bcfh_v4';
+
+const ROSTER_RAW = [
+  {npi:'1891137907',first:'Eugene',middle:'Dennis',last:'Bentley',type:'LPC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1306393376',first:'Kentrell',middle:'Michael',last:'Blatcher',type:'ADC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1699229799',first:'Donna',middle:'Anita',last:'Burks',type:'ADC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1710359138',first:'Kennyra',middle:'Latrice',last:'Colson',type:'LPC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1376915942',first:'Carrie',middle:'Shavonne',last:'Davidson',type:'LPC',affil:'',gnpi:'',addr:''},
+  {npi:'1558050518',first:'Brittney',middle:'',last:'Delafosse',type:'LCSW',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1124889829',first:'LeZerrica',middle:'Dominque',last:'Ford',type:'NP',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1669436465',first:'Sarwat',middle:'M',last:'Gad',type:'MD',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1215355623',first:'Marsha',middle:'Ann',last:'Hutchison',type:'PC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1548808058',first:'Deandre',middle:'Shikel',last:'John',type:'LPC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1821543133',first:'Ronisha',middle:'Renee',last:'Johnson',type:'LMSW',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1942947056',first:'Zakaris',middle:'Myett',last:'Martin',type:'LCSW',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1881051993',first:'Monica',middle:'',last:'Miceli',type:'ADC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1346799459',first:'Anavernyel',middle:'',last:'Neyland',type:'PMHNP',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1407213499',first:'Earnestine',middle:'',last:'Payne',type:'PC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1528575990',first:'Charalda',middle:'Monique',last:'Sullen',type:'PLPC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1336680719',first:'Devon',middle:'Elizabeth',last:'Talbert',type:'PMHNP',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1427945450',first:'Jena',middle:'Shea',last:'Townsley',type:'LMSW',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1245748409',first:'Erika',middle:'Nichol',last:'Venison',type:'PC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1932763513',first:'Ashlyn',middle:'Ludwig',last:'Wagner',type:'NP',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1205306610',first:'Monique',middle:'',last:'West',type:'PLPC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1154084747',first:'Mariah',middle:'',last:'Williams',type:'LMSW',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1649414640',first:'Weslyn',middle:'Jane',last:'Young',type:'PLPC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764'},
+  {npi:'1497378764',first:'THE BRIDGE CENTER FOR HOPE',middle:'',last:'',type:'FAC',affil:'The Bridge Center for Hope',gnpi:'1497378764',addr:'3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764',isFac:true}
+];
+
+function makeProvider(r) {
+  const isFac = !!r.isFac;
+  const fullName = isFac ? r.first : [r.first,r.last].filter(Boolean).join(' ');
+  const p = {id:'p_'+r.npi+'_'+Date.now()+Math.random(), npi:r.npi||'', first:r.first||'', middle:r.middle||'', last:r.last||'', type:r.type||'', affil:r.affil||'', gnpi:r.gnpi||'', addr:r.addr||'', isFac, fullName, notes:'', nppes:null, nppesState:'waiting', nppesFlags:[], researchRaw:'', researchExtracted:null, researchState:'waiting', payers:{}};
+  PAYERS.forEach(pay => { p.payers[pay.id] = {status:'Not Started',providerId:'',terminationDate:'',participationType:pay.id==='gainwell'?'ffs':'mco'}; });
+  return p;
+}
+
+let providers;
+try { providers = JSON.parse(localStorage.getItem(STORE_KEY)||'null'); } catch{providers=null;}
+if (!providers) { providers = ROSTER_RAW.map(makeProvider); save(); }
+
+let parsedImport = [];
+let batchStop = false;
+
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(providers)); }
+function toast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function initials(p) { return p.isFac?'FAC':((p.first||'')[0]||'').toUpperCase()+((p.last||'')[0]||'').toUpperCase(); }
+function needsAction(p) { return Object.values(p.payers).some(pay=>['Denied','Terminated','Revalidation Needed','Additional Information Requested'].includes(pay.status)); }
+function pillClass(s) { const m={'Approved':'approved','Pending Review':'pending','Not Started':'ns','Denied':'denied','Terminated':'terminated','Application Submitted':'submitted','Revalidation Needed':'revalidation','Additional Information Requested':'info'}; return 'pill pill-'+(m[s]||'ns'); }
+
+function updateStats() {
+  document.getElementById('sTotal').textContent = providers.filter(p=>!p.isFac).length;
+  document.getElementById('sApproved').textContent = providers.filter(p=>!p.isFac&&p.payers.gainwell?.status==='Approved').length;
+  document.getElementById('sAction').textContent = providers.filter(p=>!p.isFac&&needsAction(p)).length;
+  document.getElementById('sNone').textContent = providers.filter(p=>!p.isFac&&p.payers.gainwell?.status==='Not Started').length;
+}
+
+function populateTypeFilter() {
+  const sel=document.getElementById('filterType');
+  const cur=sel.value;
+  const types=[...new Set(providers.map(p=>p.type).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">All types</option>'+types.map(t=>`<option ${t===cur?'selected':''}>${t}</option>`).join('');
+}
+
+function renderRoster() {
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const ft=document.getElementById('filterType').value;
+  const fs=document.getElementById('filterStatus').value;
+  const list=providers.filter(p=>{
+    if(q&&!p.fullName.toLowerCase().includes(q)&&!p.npi.includes(q)&&!(p.type||'').toLowerCase().includes(q)) return false;
+    if(ft&&p.type!==ft) return false;
+    if(fs&&p.payers.gainwell?.status!==fs) return false;
+    return true;
+  });
+  const el=document.getElementById('rosterList');
+  if(!list.length){el.innerHTML='<div class="empty"><strong>No providers match</strong>Try adjusting your search or filters.</div>';return;}
+  el.innerHTML=list.map(p=>{
+    const gw=p.payers.gainwell;
+    return `<div class="pcard ${p.nppesState==='verified'?'c-verified':p.nppesState==='mismatch'?'c-mismatch':p.nppesState==='notfound'?'c-notfound':''}">
+      <div class="pcard-hdr" onclick="toggleCard('r',${JSON.stringify(p.id)})">
+        <div class="avi ${p.isFac?'fac':''}">${initials(p)}</div>
+        <div class="pcard-meta">
+          <div class="pcard-name">${p.fullName}</div>
+          <div class="pcard-sub">${p.npi||'No NPI'} · ${p.type||'—'}${p.affil?' · '+p.affil:''}</div>
+        </div>
+        <div class="pcard-badges">
+          <span class="${pillClass(gw.status)}">${gw.status}</span>
+          ${needsAction(p)?'<span class="pill pill-action">Needs action</span>':''}
+          ${p.nppesState==='verified'?'<span class="pill pill-verified">NPI ✓</span>':p.nppesState==='mismatch'?'<span class="pill pill-mismatch">NPI flag</span>':p.nppesState==='notfound'?'<span class="pill pill-notfound">NPI not found</span>':''}
+        </div>
+        <span class="pcard-exp" id="exp-r-${p.id}">▼</span>
+      </div>
+      <div class="pcard-body" id="body-r-${p.id}">
+        <div class="info-strip">
+          <div><div class="inf-label">NPI #</div><div class="inf-val mono">${p.npi||'—'}</div></div>
+          <div><div class="inf-label">Group NPI</div><div class="inf-val mono">${p.gnpi||'—'}</div></div>
+          <div><div class="inf-label">Address</div><div class="inf-val" style="font-size:11px">${p.addr||'—'}</div></div>
+        </div>
+        <div class="pgrid">
+          <div class="prow gw">
+            <div class="prow-name">Louisiana Medicaid / Gainwell — priority</div>
+            <div class="gw-inner">
+              <div><div class="fl">Enrollment status</div>
+                <select class="pf" onchange="updPayer(${JSON.stringify(p.id)},'gainwell','status',this.value)">
+                  ${STATUSES.map(s=>`<option ${gw.status===s?'selected':''}>${s}</option>`).join('')}
+                </select></div>
+              <div><div class="fl">Participation type</div>
+                <select class="pf" onchange="updPayer(${JSON.stringify(p.id)},'gainwell','participationType',this.value)">
+                  <option ${gw.participationType==='ffs'?'selected':''} value="ffs">FFS only</option>
+                  <option ${gw.participationType==='mco'?'selected':''} value="mco">MCO only</option>
+                  <option ${gw.participationType==='both'?'selected':''} value="both">Both FFS &amp; MCO</option>
+                </select></div>
+              <div><div class="fl">Gainwell provider ID</div>
+                <input class="pf" placeholder="Provider ID" value="${gw.providerId}" onchange="updPayer(${JSON.stringify(p.id)},'gainwell','providerId',this.value)" /></div>
+              ${gw.status==='Terminated'?`<div><div class="fl">Termination date</div><input class="pf" type="date" value="${gw.terminationDate}" onchange="updPayer(${JSON.stringify(p.id)},'gainwell','terminationDate',this.value)" /></div>`:''}
+            </div>
+            ${p.researchRaw?`<div class="res-out on" style="margin-top:10px"><div class="res-lbl">Research notes</div>${p.researchRaw.replace(/\n/g,'<br>')}</div>`:''}
+          </div>
+          ${PAYERS.filter(pay=>pay.id!=='gainwell').map(pay=>`
+            <div class="prow">
+              <div class="prow-name">${pay.name}</div>
+              ${pay.warning?`<div class="warn-tag">${pay.warning}</div>`:''}
+              <div class="fl">Enrollment status</div>
+              <select class="pf" onchange="updPayer(${JSON.stringify(p.id)},'${pay.id}','status',this.value)">
+                ${STATUSES.map(s=>`<option ${p.payers[pay.id].status===s?'selected':''}>${s}</option>`).join('')}
+              </select>
+              <div class="fl">Provider ID</div>
+              <input class="pf" placeholder="Provider ID" value="${p.payers[pay.id].providerId}" onchange="updPayer(${JSON.stringify(p.id)},'${pay.id}','providerId',this.value)" />
+            </div>`).join('')}
+        </div>
+        <div><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Notes</div>
+          <textarea class="notes" onchange="updNote(${JSON.stringify(p.id)},this.value)">${p.notes}</textarea></div>
+        <div class="card-footer">
+          <span style="font-size:11px;color:var(--text2)">${p.type||''}${p.addr?' · '+p.addr:''}</span>
+          <button class="del" onclick="delProv(${JSON.stringify(p.id)})">Remove</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderNPPES() {
+  const el=document.getElementById('nppesList');
+  el.innerHTML=providers.map((p,i)=>{
+    const n=p.nppes;
+    const stateMap={waiting:'Waiting',running:'Checking…',verified:'Verified',mismatch:'Mismatch',notfound:'Not found',error:'Error'};
+    const badgeMap={waiting:'pill-ns',running:'pill-submitted',verified:'pill-verified',mismatch:'pill-mismatch',notfound:'pill-notfound',error:'pill-action'};
+    let body='';
+    if(p.nppesState==='waiting') body='<div style="font-size:12px;color:var(--text2)">Waiting…</div>';
+    else if(p.nppesState==='running') body='<div style="font-size:12px;color:var(--blue)">Querying NPPES registry…</div>';
+    else if(p.nppesState==='notfound') body='<div style="font-size:12px;color:var(--red);font-weight:500">NPI '+p.npi+' returned no results from NPPES. May be inactive or entered incorrectly.</div>';
+    else if(p.nppesState==='error') body='<div style="font-size:12px;color:var(--red)">Lookup failed: '+p.nppesError+'</div>';
+    else if(n){
+      const nName=p.isFac?(n.organization_name||''):[n.basic?.first_name,n.basic?.last_name].filter(Boolean).join(' ');
+      const nAddr=n.addresses?.find(a=>a.address_purpose==='LOCATION');
+      const nAddrStr=nAddr?[nAddr.address_1,nAddr.city,nAddr.state,nAddr.postal_code].filter(Boolean).join(', '):'—';
+      const nTax=n.taxonomies?.[0]?.desc||'—';
+      const status=n.basic?.status;
+      body=`<div class="nppes-grid">
+        <div class="nppes-col"><div class="col-title">Roster data</div>
+          <div class="field"><div class="field-lbl">Name</div><div class="field-val">${p.fullName}</div></div>
+          <div class="field"><div class="field-lbl">NPI</div><div class="field-val" style="font-family:monospace">${p.npi}</div></div>
+          <div class="field"><div class="field-lbl">Type</div><div class="field-val">${p.type||'—'}</div></div>
+          <div class="field"><div class="field-lbl">Address</div><div class="field-val" style="font-size:11px">${p.addr||'—'}</div></div>
+        </div>
+        <div class="nppes-col registry"><div class="col-title reg">NPPES federal registry</div>
+          <div class="field"><div class="field-lbl">Name on file</div><div class="field-val">${nName||'—'}</div></div>
+          <div class="field"><div class="field-lbl">NPI status</div><div class="field-val"><span class="${status==='A'?'flag-ok':'flag-bad'}">${status==='A'?'Active':'Inactive: '+status}</span></div></div>
+          <div class="field"><div class="field-lbl">Taxonomy</div><div class="field-val" style="font-size:11px">${nTax}</div></div>
+          <div class="field"><div class="field-lbl">Address</div><div class="field-val" style="font-size:11px">${nAddrStr}</div></div>
+        </div>
+      </div>
+      <div class="nppes-extra">
+        <div class="ext-box"><div class="inf-label">Enumeration date</div><div class="inf-val">${n.basic?.enumeration_date||'—'}</div></div>
+        <div class="ext-box"><div class="inf-label">Last updated</div><div class="inf-val">${n.basic?.last_updated||'—'}</div></div>
+        <div class="ext-box"><div class="inf-label">NPI type</div><div class="inf-val">${p.isFac?'Type 2 (Org)':'Type 1 (Individual)'}</div></div>
+      </div>
+      ${p.nppesFlags.length?p.nppesFlags.map(f=>`<span class="flag-warn" style="margin-right:4px;margin-bottom:4px;display:inline-block">${f}</span>`).join(''):'<span class="flag-ok">No issues found</span>'}`;
+    }
+    return `<div class="pcard ${p.nppesState==='verified'?'c-verified':p.nppesState==='mismatch'?'c-mismatch':p.nppesState==='notfound'?'c-notfound':''}">
+      <div class="pcard-hdr" onclick="toggleCard('n',${JSON.stringify(p.id)})">
+        <div class="dot ${p.nppesState}" id="ndot-${i}"></div>
+        <div class="pcard-meta"><div class="pcard-name">${p.fullName}</div><div class="pcard-sub" style="font-family:monospace">${p.npi} · ${p.type}</div></div>
+        <span class="pill ${badgeMap[p.nppesState]||'pill-ns'}">${stateMap[p.nppesState]||'Waiting'}</span>
+        <span class="pcard-exp" id="exp-n-${p.id}">▼</span>
+      </div>
+      <div class="pcard-body" id="body-n-${p.id}">${body}</div>
+    </div>`;
+  }).join('');
+  const v=providers.filter(p=>p.nppesState==='verified').length;
+  const m=providers.filter(p=>p.nppesState==='mismatch').length;
+  const nf=providers.filter(p=>p.nppesState==='notfound').length;
+  const pend=providers.filter(p=>p.nppesState==='waiting'||p.nppesState==='running').length;
+  document.getElementById('nvVerified').textContent=v;
+  document.getElementById('nvMismatch').textContent=m;
+  document.getElementById('nvNotFound').textContent=nf;
+  document.getElementById('nvPending').textContent=pend;
+  const done=providers.length-pend;
+  document.getElementById('nppesProgFill').style.width=Math.round(done/providers.length*100)+'%';
+  document.getElementById('nppesProgCount').textContent=done+' / '+providers.length;
+}
+
+function renderResearch() {
+  const el=document.getElementById('researchList');
+  el.innerHTML=providers.map((p,i)=>{
+    const stateMap={waiting:'Waiting',running:'Researching…',done:'Done',error:'Error'};
+    const badgeMap={waiting:'pill-ns',running:'pill-submitted',done:'pill-verified',error:'pill-action'};
+    const ext=p.researchExtracted;
+    let body='';
+    if(p.researchState==='waiting') body='<div style="font-size:12px;color:var(--text2)">Waiting…</div>';
+    else if(p.researchState==='running') body='<div style="font-size:12px;color:var(--blue)">Searching Louisiana Medicaid / Gainwell portal…</div>';
+    else if(p.researchState==='error') body='<div style="font-size:12px;color:var(--red)">'+p.researchRaw+'</div>';
+    else if(ext) body=`
+      <div class="nppes-extra" style="margin-bottom:10px">
+        <div class="ext-box"><div class="inf-label">Gainwell status</div><div class="inf-val"><span class="${pillClass(ext.gainwellStatus)}">${ext.gainwellStatus}</span></div></div>
+        <div class="ext-box"><div class="inf-label">Participation type</div><div class="inf-val">${ext.participationType||'—'}</div></div>
+        <div class="ext-box"><div class="inf-label">Provider ID</div><div class="inf-val" style="font-family:monospace">${ext.providerId||'—'}</div></div>
+      </div>
+      <div class="res-out on"><div class="res-lbl">Research notes</div>${p.researchRaw.replace(/\n/g,'<br>')}</div>`;
+    return `<div class="pcard">
+      <div class="pcard-hdr" onclick="toggleCard('b',${JSON.stringify(p.id)})">
+        <div class="dot ${p.researchState==='done'?'verified':p.researchState==='error'?'error':p.researchState}" id="bdot-${i}"></div>
+        <div class="pcard-meta"><div class="pcard-name">${p.fullName}</div><div class="pcard-sub" style="font-family:monospace">${p.npi} · ${p.type}</div></div>
+        ${ext?`<span class="${pillClass(ext.gainwellStatus)}">${ext.gainwellStatus}</span>`:`<span class="pill ${badgeMap[p.researchState]||'pill-ns'}">${stateMap[p.researchState]||'Waiting'}</span>`}
+        <span class="pcard-exp" id="exp-b-${p.id}">▼</span>
+      </div>
+      <div class="pcard-body" id="body-b-${p.id}">${body}</div>
+    </div>`;
+  }).join('');
+  const done=providers.filter(p=>p.researchState==='done').length;
+  const found=providers.filter(p=>p.researchExtracted&&['Active','Approved','Enrolled'].includes(p.researchExtracted.gainwellStatus)).length;
+  const unk=providers.filter(p=>p.researchExtracted&&['Not Found','Unknown'].includes(p.researchExtracted.gainwellStatus)).length;
+  const err=providers.filter(p=>p.researchState==='error').length;
+  document.getElementById('brDone').textContent=done;
+  document.getElementById('brFound').textContent=found;
+  document.getElementById('brUnknown').textContent=unk;
+  document.getElementById('brError').textContent=err;
+  const total=providers.length;
+  document.getElementById('batchProgFill').style.width=Math.round((done+err)/total*100)+'%';
+  document.getElementById('batchProgCount').textContent=(done+err)+' / '+total;
+}
+
+function renderSummary() {
+  const el=document.getElementById('summaryContent');
+  if(!providers.length){el.innerHTML='<div class="empty"><strong>No providers</strong></div>';return;}
+  el.innerHTML=`<div style="overflow-x:auto"><table class="sum-table">
+    <thead><tr><th>Last name</th><th>First name</th><th>NPI #</th><th>Type</th><th>Gainwell status</th><th>Participation</th><th>Provider ID</th><th>NPI check</th></tr></thead>
+    <tbody>${providers.map(p=>{
+      const gw=p.payers.gainwell;
+      const nCheck={verified:'<span class="flag-ok">Verified</span>',mismatch:'<span class="flag-warn">Mismatch</span>',notfound:'<span class="flag-bad">Not found</span>',waiting:'—',running:'—'}[p.nppesState]||'—';
+      return `<tr>
+        <td style="font-weight:500">${p.last||p.first}</td>
+        <td>${p.isFac?'':p.first}</td>
+        <td style="font-family:monospace;font-size:12px;color:var(--text2)">${p.npi||'—'}</td>
+        <td style="font-size:12px">${p.type||'—'}</td>
+        <td><span class="${pillClass(gw.status)}">${gw.status}</span></td>
+        <td style="font-size:12px">${gw.participationType==='ffs'?'FFS':gw.participationType==='mco'?'MCO':'FFS+MCO'}</td>
+        <td style="font-family:monospace;font-size:12px;color:var(--text2)">${gw.providerId||'—'}</td>
+        <td>${nCheck}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function toggleCard(prefix,id) {
+  const b=document.getElementById('body-'+prefix+'-'+id);
+  const e=document.getElementById('exp-'+prefix+'-'+id);
+  if(b){ b.classList.toggle('open'); if(e) e.textContent=b.classList.contains('open')?'▲':'▼'; }
+}
+
+// ── ACTION ITEMS ──────────────────────────────────────────────
+function buildActions(p) {
+  const actions = [];
+  const gw = p.payers.gainwell;
+  const hasNPPES = p.nppesState !== 'waiting';
+  const nppesStateMismatch = p.nppesFlags?.some(f => f.includes('practice state'));
+  const nppesNameMismatch = p.nppesFlags?.some(f => f.includes('name'));
+  const nppesInactive = p.nppesFlags?.some(f => f.includes('not Active'));
+  const nppesNotFound = p.nppesState === 'notfound';
+
+  // NPPES: NPI not found
+  if (nppesNotFound) {
+    actions.push({
+      priority: 'urgent',
+      what: 'Confirm NPI number — provider cannot be credentialed',
+      why: 'NPI ' + p.npi + ' returned no results from the federal NPPES registry. Without a valid, active NPI, no payer enrollment can be submitted or processed.',
+      steps: [
+        'Verify the NPI number in the roster is correct',
+        'Search nppes.cms.hhs.gov manually using the provider\'s name to find their correct NPI',
+        'If the provider has no NPI, they must apply at nppes.cms.hhs.gov before any credentialing can begin',
+        'Update the roster once the correct NPI is confirmed'
+      ],
+      tags: ['NPPES', 'Blocks all enrollment']
+    });
+  }
+
+  // NPPES: NPI inactive
+  if (nppesInactive) {
+    actions.push({
+      priority: 'urgent',
+      what: 'Reactivate NPI at NPPES — currently inactive',
+      why: 'The federal registry shows this provider\'s NPI as inactive. Payers will reject enrollment applications for providers with inactive NPIs.',
+      steps: [
+        'Provider must log in to nppes.cms.hhs.gov using their credentials',
+        'Navigate to "Manage NPI" and reactivate the NPI record',
+        'Allow 1–3 business days for the update to propagate',
+        'Re-run NPI verification in this app to confirm Active status before proceeding'
+      ],
+      tags: ['NPPES', 'Blocks all enrollment']
+    });
+  }
+
+  // NPPES: wrong practice state
+  if (nppesStateMismatch) {
+    const flag = p.nppesFlags.find(f => f.includes('practice state'));
+    const state = flag ? flag.match(/is (\w+),/)?.[1] : 'another state';
+    actions.push({
+      priority: 'required',
+      what: 'Update NPPES practice location to Louisiana before submitting enrollment',
+      why: 'NPPES shows this provider\'s primary practice address in ' + state + ', not Louisiana. Gainwell and MCO plans cross-reference the NPI registry during enrollment review. A state mismatch can delay or flag the application.',
+      steps: [
+        'Provider logs in to nppes.cms.hhs.gov',
+        'Under "Practice Location," update the primary address to: 3455 Florida St, Ste 400, Baton Rouge, LA 70806',
+        'Save and allow 1–3 business days for the update to reflect',
+        'Re-run NPI verification in this app to confirm before submitting Gainwell application'
+      ],
+      tags: ['NPPES', 'Required before Gainwell', 'Required before MCOs']
+    });
+  }
+
+  // NPPES: name mismatch
+  if (nppesNameMismatch) {
+    const flag = p.nppesFlags.find(f => f.includes('name'));
+    actions.push({
+      priority: 'required',
+      what: 'Resolve name discrepancy between roster and NPPES',
+      why: 'The name in the roster does not exactly match what is on file with NPPES. Payers may reject or flag enrollment applications where the name does not match the NPI registry. ' + (flag || ''),
+      steps: [
+        'Confirm the provider\'s legal name as it appears on their license and credentials',
+        'If the roster is wrong, update the provider record in this app and in Modio',
+        'If NPPES is wrong, the provider must update their record at nppes.cms.hhs.gov',
+        'Use the legal name consistently across all enrollment submissions'
+      ],
+      tags: ['NPPES', 'Data quality']
+    });
+  }
+
+  // Gainwell: Not Started
+  if (gw.status === 'Not Started' && !nppesNotFound && !nppesInactive) {
+    if (nppesStateMismatch) {
+      actions.push({
+        priority: 'required',
+        what: 'Complete NPPES address update before initiating Gainwell enrollment',
+        why: 'Gainwell enrollment cannot be submitted until the NPPES practice state mismatch is resolved (see action above). Submitting before the fix may result in a delayed or denied application.',
+        steps: [
+          'Complete the NPPES address update first',
+          'Once NPPES reflects Louisiana as the practice state, initiate Gainwell enrollment application',
+          'Submit via the Louisiana Medicaid provider portal at Medicaid.Louisiana.gov'
+        ],
+        tags: ['Gainwell', 'Blocked by NPPES']
+      });
+    } else {
+      actions.push({
+        priority: 'next',
+        what: 'Initiate Louisiana Medicaid / Gainwell enrollment application',
+        why: 'This provider has no Gainwell enrollment on record. They cannot bill Louisiana Medicaid (FFS or MCO) until enrollment is approved.',
+        steps: [
+          'Log in to the Louisiana Medicaid provider portal at Medicaid.Louisiana.gov',
+          'Submit a new enrollment application for this provider',
+          'Select enrollment type: FFS, MCO, or both based on the provider\'s role',
+          'Upload required supporting documents (license, W-9, etc.)',
+          'Track application status in this app under Gainwell Status'
+        ],
+        tags: ['Gainwell', 'New enrollment']
+      });
+    }
+  }
+
+  // Gainwell: Terminated
+  if (gw.status === 'Terminated') {
+    actions.push({
+      priority: 'urgent',
+      what: 'Address Gainwell termination — determine if retroactive billing is possible',
+      why: 'This provider\'s Gainwell enrollment has been terminated. They cannot bill Louisiana Medicaid until re-enrolled. Claims submitted after the termination date will be denied.',
+      steps: [
+        'Contact Gainwell provider relations to obtain the reason for termination',
+        'Determine the exact termination date and record it in the provider notes',
+        'Ask whether claims submitted before the termination date can still be billed retroactively',
+        'If termination was administrative (e.g., revalidation failure), begin re-enrollment immediately',
+        'If termination was for cause, consult compliance before re-enrolling'
+      ],
+      tags: ['Gainwell', 'Urgent — billing impacted']
+    });
+  }
+
+  // Gainwell: Revalidation Needed
+  if (gw.status === 'Revalidation Needed') {
+    actions.push({
+      priority: 'urgent',
+      what: 'Submit Gainwell revalidation immediately — billing may be suspended',
+      why: 'Gainwell requires periodic revalidation of enrolled providers. Failure to revalidate results in automatic termination and suspension of billing privileges.',
+      steps: [
+        'Log in to the Louisiana Medicaid provider portal',
+        'Locate the revalidation request for this provider',
+        'Complete and submit all required revalidation documentation',
+        'Confirm submission and note the confirmation number in provider notes',
+        'Follow up if no response within 30 days'
+      ],
+      tags: ['Gainwell', 'Time-sensitive']
+    });
+  }
+
+  // Gainwell: Additional Information Requested
+  if (gw.status === 'Additional Information Requested') {
+    actions.push({
+      priority: 'urgent',
+      what: 'Respond to Gainwell information request — application is stalled',
+      why: 'Gainwell has requested additional information on this provider\'s enrollment application. Until a response is submitted, the application cannot move forward and may be closed.',
+      steps: [
+        'Log in to the Louisiana Medicaid provider portal and locate the open request',
+        'Identify exactly what documentation or information is being requested',
+        'Gather and upload the requested materials',
+        'Submit the response and note the date in provider notes',
+        'Follow up within 5 business days if no status change'
+      ],
+      tags: ['Gainwell', 'Response required']
+    });
+  }
+
+  // Gainwell: Denied
+  if (gw.status === 'Denied') {
+    actions.push({
+      priority: 'urgent',
+      what: 'Review Gainwell denial — determine appeal or reapplication path',
+      why: 'This provider\'s Gainwell enrollment application was denied. They cannot bill Louisiana Medicaid until enrollment is approved through appeal or a new application.',
+      steps: [
+        'Obtain the denial letter from the Louisiana Medicaid provider portal',
+        'Identify the specific reason(s) for denial',
+        'Consult with compliance on whether to appeal or reapply',
+        'If appealing, submit the appeal with supporting documentation within the deadline stated in the denial letter',
+        'If reapplying, address the denial reason(s) before submitting a new application'
+      ],
+      tags: ['Gainwell', 'Billing blocked']
+    });
+  }
+
+  // Gainwell: Pending Review or Application Submitted
+  if (gw.status === 'Pending Review' || gw.status === 'Application Submitted') {
+    actions.push({
+      priority: 'next',
+      what: 'Monitor Gainwell application status',
+      why: 'This provider\'s enrollment application is in progress. No action is required unless the status changes to "Additional Information Requested" or the application is denied.',
+      steps: [
+        'Check the Louisiana Medicaid provider portal weekly for status updates',
+        'Update the status in this app when it changes',
+        'Standard processing time is 30–90 days',
+        'If no update after 45 days, contact Gainwell provider relations to confirm receipt'
+      ],
+      tags: ['Gainwell', 'In progress']
+    });
+  }
+
+  // Gainwell Approved: check MCOs
+  if (gw.status === 'Approved') {
+    const mcoNotStarted = PAYERS.filter(pay => pay.id !== 'gainwell' && p.payers[pay.id]?.status === 'Not Started');
+    if (mcoNotStarted.length > 0) {
+      actions.push({
+        priority: 'next',
+        what: 'Begin MCO enrollment applications (' + mcoNotStarted.length + ' plans not started)',
+        why: 'Gainwell (FFS) enrollment is approved. MCO participation requires separate enrollment with each plan. Providers not enrolled with MCOs cannot bill managed care patients.',
+        steps: mcoNotStarted.map(pay => 'Initiate enrollment with ' + pay.name + (pay.warning ? ' — note: ' + pay.warning : '')),
+        tags: ['MCO', 'Next phase']
+      });
+    }
+
+    // UHC contract ended
+    const uhc = p.payers['uhc'];
+    if (uhc && uhc.status !== 'Terminated' && uhc.status !== 'Not Started') {
+      actions.push({
+        priority: 'required',
+        what: 'Review UnitedHealthcare enrollment — contract ended 3/31/2026',
+        why: 'The UnitedHealthcare Community Plan MCO contract ended on 3/31/2026. Verify whether this provider\'s enrollment is still valid or needs to be addressed.',
+        steps: [
+          'Confirm with Pamela whether RI International has a new or replacement UHC contract',
+          'Determine if existing enrolled providers need to take any action',
+          'Do not submit new UHC enrollments until the contract status is clarified'
+        ],
+        tags: ['UnitedHealthcare', 'Contract issue']
+      });
+    }
+  }
+
+  return actions;
+}
+
+function renderActions() {
+  const filter = document.getElementById('actionFilter').value;
+  const el = document.getElementById('actionsList');
+  const statsEl = document.getElementById('actionStats');
+
+  let allActions = [];
+  providers.forEach(p => {
+    const acts = buildActions(p);
+    acts.forEach(a => allActions.push({ ...a, provider: p }));
+  });
+
+  // Count by priority
+  const urgentCount = allActions.filter(a => a.priority === 'urgent').length;
+  const requiredCount = allActions.filter(a => a.priority === 'required').length;
+  const nextCount = allActions.filter(a => a.priority === 'next').length;
+
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-label">Urgent</div><div class="stat-value" style="color:var(--red)">${urgentCount}</div></div>
+    <div class="stat"><div class="stat-label">Required first</div><div class="stat-value" style="color:var(--amber)">${requiredCount}</div></div>
+    <div class="stat"><div class="stat-label">Next steps</div><div class="stat-value" style="color:var(--blue)">${nextCount}</div></div>
+    <div class="stat"><div class="stat-label">Total</div><div class="stat-value">${allActions.length}</div></div>`;
+
+  const filtered = filter ? allActions.filter(a => a.priority === filter) : allActions;
+  // Sort: urgent first, then required, then next
+  const order = { urgent: 0, required: 1, next: 2 };
+  filtered.sort((a, b) => order[a.priority] - order[b.priority]);
+
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty"><strong>No action items</strong>' + (filter ? 'No items in this category.' : 'Run NPI verification and Gainwell research to generate action items.') + '</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map((a, i) => {
+    const pbClass = { urgent: 'pb-urgent', required: 'pb-required', next: 'pb-next' }[a.priority];
+    const pbLabel = { urgent: 'Urgent', required: 'Required first', next: 'Next step' }[a.priority];
+    return `<div class="action-card ${a.priority}">
+      <div class="action-hdr" onclick="toggleActionCard(${i})">
+        <span class="priority-badge ${pbClass}">${pbLabel}</span>
+        <div class="action-main">
+          <div class="action-provider">${a.provider.fullName} <span style="font-size:11px;color:var(--text2);font-weight:400">· ${a.provider.type} · ${a.provider.npi}</span></div>
+          <div class="action-what">${a.what}</div>
+        </div>
+        <span class="action-exp" id="aexp-${i}">▼</span>
+      </div>
+      <div class="action-body" id="abody-${i}">
+        <div class="action-why">${a.why}</div>
+        <ul class="action-steps">${a.steps.map(s => `<li>${s}</li>`).join('')}</ul>
+        <div class="action-meta">${a.tags.map(t => `<span class="action-tag">${t}</span>`).join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleActionCard(i) {
+  const b = document.getElementById('abody-'+i);
+  const e = document.getElementById('aexp-'+i);
+  if (b) { b.classList.toggle('open'); if(e) e.textContent = b.classList.contains('open') ? '▲' : '▼'; }
+}
+
+function exportActions() {
+  let allActions = [];
+  providers.forEach(p => {
+    buildActions(p).forEach(a => allActions.push({ ...a, provider: p }));
+  });
+  const order = { urgent: 0, required: 1, next: 2 };
+  allActions.sort((a,b) => order[a.priority] - order[b.priority]);
+  const hdrs = ['Priority','Provider','NPI','Credential Type','Action Required','Why','Steps','Tags'];
+  const rows = allActions.map(a => [
+    { urgent:'Urgent', required:'Required Before Enrollment', next:'Next Step' }[a.priority],
+    a.provider.fullName, a.provider.npi, a.provider.type,
+    a.what, a.why, a.steps.join(' | '), a.tags.join(', ')
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([hdrs, ...rows]);
+  ws['!cols'] = [{wch:18},{wch:22},{wch:13},{wch:13},{wch:50},{wch:60},{wch:80},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Action Items');
+  XLSX.writeFile(wb, 'LA_Credentialing_Action_Items.xlsx');
+}
+function showTab(name,btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='summary') renderSummary();
+  if(name==='nppes') renderNPPES();
+  if(name==='research') renderResearch();
+  if(name==='actions') renderActions();
+}
+function setMode(m) {
+  document.getElementById('panel-manual').style.display=m==='manual'?'block':'none';
+  document.getElementById('panel-upload').style.display=m==='upload'?'block':'none';
+  document.getElementById('mb-manual').classList.toggle('active',m==='manual');
+  document.getElementById('mb-upload').classList.toggle('active',m==='upload');
+}
+function updPayer(id,payId,field,val) {
+  const p=providers.find(p=>p.id===id);if(!p)return;
+  p.payers[payId][field]=val;save();updateStats();
+  if(field==='status')renderRoster();
+}
+function updNote(id,val){const p=providers.find(p=>p.id===id);if(p){p.notes=val;save();}}
+function delProv(id){providers=providers.filter(p=>p.id!==id);save();render();toast('Provider removed');}
+
+function addManual(){
+  const first=document.getElementById('fFirst').value.trim();
+  const last=document.getElementById('fLast').value.trim();
+  if(!first||!last){toast('First and last name required');return;}
+  const r={npi:document.getElementById('fNPI').value.trim(),first,middle:document.getElementById('fMiddle').value.trim(),last,type:document.getElementById('fType').value,affil:document.getElementById('fAffil').value.trim(),gnpi:document.getElementById('fGNPI').value.trim(),addr:document.getElementById('fAddr').value.trim()};
+  const p=makeProvider(r);
+  p.payers.gainwell.status=document.getElementById('fGWStatus').value;
+  providers.push(p);save();render();toast('Provider added');
+  ['fFirst','fMiddle','fLast','fNPI','fGNPI','fAddr'].forEach(id=>document.getElementById(id).value='');
+  showTab('roster',document.querySelector('.tab'));
+}
+
+function handleDrop(e){e.preventDefault();handleFile(e.dataTransfer.files[0]);}
+function handleFile(file){
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    let rows=[];
+    if(ext==='csv'){
+      const lines=ev.target.result.split('\n').filter(l=>l.trim());
+      const hdrs=lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+      rows=lines.slice(1).map(l=>{const vs=l.split(',').map(v=>v.replace(/"/g,'').trim());const o={};hdrs.forEach((h,i)=>o[h]=vs[i]||'');return o;}).filter(r=>Object.values(r).some(v=>v));
+    } else {
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    }
+    parsedImport=rows;showImportPreview(rows);
+  };
+  if(ext==='csv')reader.readAsText(file);else reader.readAsArrayBuffer(file);
+}
+function findCol(row,...hints){const keys=Object.keys(row);for(const h of hints){const k=keys.find(k=>k.toLowerCase().includes(h.toLowerCase()));if(k)return k;}return null;}
+function showImportPreview(rows){
+  if(!rows.length)return;
+  const r0=rows[0];
+  const nk=findCol(r0,'npi');const fk=findCol(r0,'first');const lk=findCol(r0,'last');const tk=findCol(r0,'provider type','type');const ak=findCol(r0,'affil','practice');
+  document.getElementById('prevTitle').textContent='Preview — '+rows.length+' providers detected';
+  document.getElementById('prevCount').textContent='Importing '+rows.filter(r=>fk&&r[fk]).length+' providers';
+  document.getElementById('prevTable').innerHTML=`<thead><tr><th>NPI</th><th>First</th><th>Last</th><th>Type</th><th>Affiliation</th></tr></thead><tbody>${rows.slice(0,5).map(r=>`<tr><td style="font-family:monospace;font-size:12px">${nk?r[nk]||'—':'—'}</td><td>${fk?r[fk]||'—':'—'}</td><td>${lk?r[lk]||'—':'—'}</td><td>${tk?r[tk]||'—':'—'}</td><td style="font-size:12px;color:var(--text2)">${ak?r[ak]||'—':'—'}</td></tr>`).join('')}</tbody>`;
+  document.getElementById('importPreview').style.display='block';
+}
+function confirmImport(){
+  if(!parsedImport.length)return;
+  const r0=parsedImport[0];
+  const nk=findCol(r0,'npi');const fk=findCol(r0,'first');const mk=findCol(r0,'middle');const lk=findCol(r0,'last');const tk=findCol(r0,'provider type','type');const ak=findCol(r0,'affil','practice');const gk=findCol(r0,'group npi','gnpi');const adk=findCol(r0,'address','addr');
+  let added=0;
+  parsedImport.forEach(r=>{
+    const first=(fk?r[fk]:'')?.toString().trim();if(!first)return;
+    const raw={npi:(nk?r[nk]:'')?.toString().replace(/\.0$/,'').trim(),first,middle:(mk?r[mk]:'')?.toString().trim(),last:(lk?r[lk]:'')?.toString().trim(),type:(tk?r[tk]:'')?.toString().trim(),affil:(ak?r[ak]:'')?.toString().trim(),gnpi:(gk?r[gk]:'')?.toString().replace(/\.0$/,'').trim(),addr:(adk?r[adk]:'')?.toString().trim()};
+    providers.push(makeProvider(raw));added++;
+  });
+  save();render();cancelImport();toast(added+' provider'+(added!==1?'s':'')+' imported');
+  showTab('roster',document.querySelector('.tab'));
+}
+function cancelImport(){parsedImport=[];document.getElementById('importPreview').style.display='none';document.getElementById('fileInput').value='';}
+function dlTemplate(){
+  const hdrs=['NPI #','First Name','Middle Name','Last Name','Provider Type','Practice/Affiliation','Group NPI','Full Address'];
+  const sample=[['1891137907','Eugene','Dennis','Bentley','LPC','The Bridge Center for Hope','1497378764','3455 Florida St, Ste 400, Baton Rouge, LA 70806-3764']];
+  const ws=XLSX.utils.aoa_to_sheet([hdrs,...sample]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Providers');
+  XLSX.writeFile(wb,'RI_LA_Provider_Template.xlsx');
+}
+
+// NPPES via Netlify function
+async function runNPPES(){
+  document.getElementById('btnNPPES').disabled=true;
+  document.getElementById('nppesProgLabel').textContent='Running…';
+  for(let i=0;i<providers.length;i++){
+    providers[i].nppesState='running';renderNPPES();
+    document.getElementById('nppesProgLabel').textContent='Checking '+(i+1)+' of '+providers.length+'…';
+    try{
+      const res=await fetch('/api/nppes?npi='+providers[i].npi);
+      const data=await res.json();
+      if(!data.results||data.results.length===0){
+        providers[i].nppesState='notfound';providers[i].nppes=null;providers[i].nppesFlags=['NPI not found in NPPES registry'];
+      } else {
+        const n=data.results[0];
+        providers[i].nppes=n;
+        const flags=[];
+        if(n.basic?.status&&n.basic.status!=='A') flags.push('NPI status is not Active: '+n.basic.status);
+        if(!providers[i].isFac){
+          const nf=(n.basic?.first_name||'').toLowerCase().trim();
+          const nl=(n.basic?.last_name||'').toLowerCase().trim();
+          const rf=(providers[i].first||'').toLowerCase().trim();
+          const rl=(providers[i].last||'').toLowerCase().trim();
+          if(nf&&rf&&!nf.includes(rf)&&!rf.includes(nf)) flags.push('First name: roster "'+providers[i].first+'" vs NPPES "'+n.basic?.first_name+'"');
+          if(nl&&rl&&nl!==rl) flags.push('Last name: roster "'+providers[i].last+'" vs NPPES "'+n.basic?.last_name+'"');
+        }
+        const addr=n.addresses?.find(a=>a.address_purpose==='LOCATION');
+        if(addr?.state&&addr.state!=='LA') flags.push('Primary practice state is '+addr.state+', not LA');
+        providers[i].nppesFlags=flags;
+        providers[i].nppesState=flags.length>0?'mismatch':'verified';
+      }
+    }catch(err){
+      providers[i].nppesState='error';providers[i].nppesError=err.message;
+    }
+    save();renderNPPES();renderRoster();
+    if(['mismatch','notfound','error'].includes(providers[i].nppesState)){
+      const b=document.getElementById('body-n-'+providers[i].id);
+      const e=document.getElementById('exp-n-'+providers[i].id);
+      if(b){b.classList.add('open');if(e)e.textContent='▲';}
+    }
+    if(i<providers.length-1) await new Promise(r=>setTimeout(r,200));
+  }
+  document.getElementById('nppesProgLabel').textContent='Complete';
+  document.getElementById('btnNPPES').disabled=false;
+  document.getElementById('nppesExportBar').style.display='flex';
+}
+
+// Gainwell batch research
+function extractResearch(text){
+  const t=text.toLowerCase();
+  let gainwellStatus='Unknown';let participationType='';let providerId='';
+  if(t.includes('active')||t.includes('enrolled')||t.includes('approved')||t.includes('participating')) gainwellStatus='Active';
+  else if(t.includes('terminated')||t.includes('deactivated')) gainwellStatus='Terminated';
+  else if(t.includes('pending')||t.includes('in process')) gainwellStatus='Pending';
+  else if(t.includes('denied')||t.includes('rejected')) gainwellStatus='Denied';
+  else if(t.includes('not found')||t.includes('no record')||t.includes('not enrolled')||t.includes('not publicly')||t.includes('could not confirm')) gainwellStatus='Not Found';
+  if(t.includes('ffs')&&t.includes('mco')) participationType='FFS + MCO';
+  else if(t.includes('fee-for-service')||t.includes('fee for service')||t.includes('ffs')) participationType='FFS';
+  else if(t.includes('mco')||t.includes('managed care')) participationType='MCO';
+  const m=text.match(/provider\s*id[:\s#]+([A-Z0-9\-]{5,15})/i)||text.match(/medicaid\s*id[:\s#]+([A-Z0-9\-]{5,15})/i);
+  if(m) providerId=m[1];
+  return {gainwellStatus,participationType,providerId};
+}
+
+async function runBatch(){
+  document.getElementById('btnBatch').disabled=true;
+  document.getElementById('btnStop').disabled=false;
+  batchStop=false;
+  document.getElementById('batchProgLabel').textContent='Running…';
+  for(let i=0;i<providers.length;i++){
+    if(batchStop) break;
+    if(providers[i].researchState==='done') continue;
+    providers[i].researchState='running';renderResearch();
+    document.getElementById('batchProgLabel').textContent='Researching '+(i+1)+' of '+providers.length+'…';
+    const p=providers[i];
+    const prompt=`You are a healthcare credentialing specialist. Research the Louisiana Medicaid / Gainwell enrollment status for:\nProvider: ${p.fullName}\nNPI: ${p.npi}\nCredential: ${p.type}${p.affil?'\nAffiliation: '+p.affil:''}\n\nSearch the Louisiana Department of Health Medicaid provider portal and NPI registry. Return:\n- Gainwell Status: [Active / Not Found / Terminated / Pending / Denied / Unknown]\n- Participation Type: [FFS / MCO / FFS + MCO / Unknown]\n- Provider ID: [ID or Not Found]\n- Notes: [brief factual summary]`;
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+      const data=await res.json();
+      if(data.error) throw new Error(data.error.message);
+      const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n')||'No response.';
+      providers[i].researchRaw=text;
+      providers[i].researchExtracted=extractResearch(text);
+      providers[i].researchState='done';
+      // Sync extracted status to payer record
+      const ext=providers[i].researchExtracted;
+      if(ext.gainwellStatus==='Active') providers[i].payers.gainwell.status='Approved';
+      else if(ext.gainwellStatus==='Terminated') providers[i].payers.gainwell.status='Terminated';
+      else if(ext.gainwellStatus==='Pending') providers[i].payers.gainwell.status='Pending Review';
+      if(ext.providerId) providers[i].payers.gainwell.providerId=ext.providerId;
+      if(ext.participationType==='FFS') providers[i].payers.gainwell.participationType='ffs';
+      else if(ext.participationType==='MCO') providers[i].payers.gainwell.participationType='mco';
+      else if(ext.participationType==='FFS + MCO') providers[i].payers.gainwell.participationType='both';
+    }catch(err){
+      providers[i].researchRaw='Search failed: '+err.message;
+      providers[i].researchState='error';
+    }
+    save();renderResearch();renderRoster();updateStats();
+    const b=document.getElementById('body-b-'+providers[i].id);
+    const e=document.getElementById('exp-b-'+providers[i].id);
+    if(b){b.classList.add('open');if(e)e.textContent='▲';}
+    if(i<providers.length-1&&!batchStop) await new Promise(r=>setTimeout(r,800));
+  }
+  document.getElementById('batchProgLabel').textContent=batchStop?'Stopped':'Complete';
+  document.getElementById('btnBatch').disabled=false;
+  document.getElementById('btnStop').disabled=true;
+  if(providers.some(p=>p.researchState==='done')) document.getElementById('researchExportBar').style.display='flex';
+}
+function stopBatch(){batchStop=true;document.getElementById('btnStop').disabled=true;}
+
+function exportNPPES(){
+  const hdrs=['NPI #','First Name','Middle Name','Last Name','Provider Type','Practice/Affiliation','NPPES Status','NPPES Name','NPPES Taxonomy','NPPES Last Updated','Flags'];
+  const rows=providers.map(p=>{
+    const n=p.nppes;
+    const nName=n?(p.isFac?(n.organization_name||''):[n.basic?.first_name,n.basic?.last_name].filter(Boolean).join(' ')):'';
+    return [p.npi,p.first,p.middle||'',p.last||'',p.type,p.affil||'',n?.basic?.status==='A'?'Active':(n?.basic?.status||'Not Found'),nName,n?.taxonomies?.[0]?.desc||'',n?.basic?.last_updated||'',p.nppesFlags.join('; ')||'None'];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([hdrs,...rows]);
+  ws['!cols']=[{wch:13},{wch:14},{wch:12},{wch:12},{wch:13},{wch:26},{wch:12},{wch:22},{wch:30},{wch:14},{wch:50}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'NPPES Verification');
+  XLSX.writeFile(wb,'LA_NPPES_Verification.xlsx');
+}
+
+function exportResearch(){
+  const hdrs=['NPI #','First Name','Last Name','Provider Type','Gainwell Status','Participation Type','Provider ID','Research Notes'];
+  const rows=providers.map(p=>{
+    const ext=p.researchExtracted;
+    return [p.npi,p.first,p.last||'',p.type,ext?.gainwellStatus||'Not Run',ext?.participationType||'',ext?.providerId||'',p.researchRaw||''];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([hdrs,...rows]);
+  ws['!cols']=[{wch:13},{wch:14},{wch:12},{wch:13},{wch:18},{wch:16},{wch:18},{wch:60}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Gainwell Research');
+  XLSX.writeFile(wb,'LA_Gainwell_Research.xlsx');
+}
+
+function exportFull(){
+  const hdrs=['NPI #','First Name','Middle Name','Last Name','Provider Type','Practice/Affiliation','Group NPI','Full Address','Gainwell Status','Participation Type','Gainwell Provider ID','Aetna Better Health','Aetna Provider ID','AmeriHealth Caritas','AmeriHealth Provider ID','Healthy Blue','Healthy Blue Provider ID','Humana Healthy Horizons','Humana Provider ID','LA Healthcare Connections','LA HC Provider ID','UnitedHealthcare','UHC Provider ID','Notes'];
+  const rows=providers.map(p=>{
+    const gw=p.payers.gainwell;
+    return [p.npi,p.first,p.middle||'',p.last||'',p.type,p.affil||'',p.gnpi||'',p.addr||'',gw.status,gw.participationType,gw.providerId,...PAYERS.filter(pay=>pay.id!=='gainwell').flatMap(pay=>[p.payers[pay.id].status,p.payers[pay.id].providerId]),p.notes||''];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([hdrs,...rows]);
+  ws['!cols']=[{wch:13},{wch:14},{wch:12},{wch:12},{wch:13},{wch:26},{wch:13},{wch:40},{wch:18},{wch:16},{wch:20},{wch:18},{wch:18},{wch:18},{wch:18},{wch:14},{wch:18},{wch:20},{wch:18},{wch:24},{wch:18},{wch:18},{wch:16},{wch:30}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'LA Provider Credentialing');
+  XLSX.writeFile(wb,'LA_PROV_ROSTER_Credentialing.xlsx');
+}
+
+function render(){updateStats();populateTypeFilter();renderRoster();}
+render();
+</script>
+</body>
+</html>
